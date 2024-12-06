@@ -26,7 +26,9 @@ enum TokenType {
     Tsin, Tcos, Ttan, Tcot, Tlog,
     Tplus, Tminus, Tmult, Tdiv, Tpow,
     TlParen, TrParen,
-    TENDOFFILE
+    TENDOFFILE,
+
+    Tunspecified
 };
 
 struct Token {
@@ -156,6 +158,106 @@ public:
     }
 };
 
+enum NodeType {
+    binaryExpr,
+    funcCall,
+    variable,
+    constant
+};
+
+struct Node {
+    NodeType type;
+    
+    TokenType tokType;
+
+    double value;
+
+    Node* a;
+    Node* b;
+};
+
+class Parser {
+private:
+    vector<Token> toks;
+    size_t pos;
+
+    Node* expr() {
+        Node a{ NodeType::binaryExpr, TokenType::Tunspecified, 0, term(), nullptr };
+        ++pos;
+        while (toks[pos].type == TokenType::Tplus ||
+            toks[pos].type == TokenType::Tminus) {
+            a.tokType = toks[pos].type;
+            ++pos;
+            a.b = term();
+            a.a = ;
+            a->
+        }
+        return &a;
+    }
+
+    Node* term() {
+
+    }
+
+    Node* factor() {
+
+    }
+
+    Node* func_call() {
+        if (!(toks[pos].type == TokenType::Tsin) ||
+            (toks[pos].type == TokenType::Tcos) ||
+            (toks[pos].type == TokenType::Ttan) ||
+            (toks[pos].type == TokenType::Tcot) ||
+            (toks[pos].type == TokenType::Tlog)) {
+            throw "Parser error: expected function identifier";
+        }
+        Node ret{ NodeType::funcCall, toks[pos].type, 0, nullptr, nullptr };
+        ++pos;
+        if (toks[pos].type != TokenType::TlParen) throw "Parser error: expected '(' after function identifier";
+        ++pos;
+        ret.a = expr();
+        if (toks[pos].type != TokenType::TrParen) throw "Parser error: expected ')' after function argument";
+        ++pos;
+        return &ret;
+    }
+
+    Node* basic() {
+        if (toks[pos].type == TokenType::Tconstant) {
+            Node ret{ NodeType::constant, TokenType::Tconstant, toks[pos].value, nullptr, nullptr };
+            ++pos;
+            return &ret;
+        }
+        if (toks[pos].type == TokenType::Tvariable) {
+            Node ret{ NodeType::variable, TokenType::Tvariable, 0, nullptr, nullptr};
+            ++pos;
+            return &ret;
+        }
+        if ((toks[pos].type == TokenType::Tsin) ||
+            (toks[pos].type == TokenType::Tcos) ||
+            (toks[pos].type == TokenType::Ttan) ||
+            (toks[pos].type == TokenType::Tcot) ||
+            (toks[pos].type == TokenType::Tlog)) {
+            return func_call();
+        }
+
+        if (toks[pos].type != TokenType::TlParen) throw "Parser error: unexpected token";
+        ++pos;
+        Node* ret = expr();
+        if (toks[pos].type != TokenType::TrParen) throw "Parser error: expected ')' after '('";
+        ++pos;
+        return ret;
+    }
+
+public:
+    Parser(vector<Token> tokens) : toks(tokens), pos(0) {}
+
+    Node* parse() {
+        return expr();
+    }
+};
+
+// For testing
+
 string double_to_str(double d) {
     if (floor(d) == d) {
         return to_string((int)d);
@@ -167,62 +269,68 @@ string double_to_str(double d) {
     return res;
 }
 
-string TokenVecToString(const vector<Token> tokens) {
-    string result = "";
-    for (const Token& tok : tokens) {
-        switch (tok.type) {
-        case TokenType::Tconstant:
-            result += "constant";
-            result += " " + double_to_str(tok.value);
-            break;
-        case TokenType::Tvariable:
-            result += "variable";
-            break;
-        case TokenType::Tsin:
-            result += "sin";
-            break;
-        case TokenType::Tcos:
-            result += "cos";
-            break;
-        case TokenType::Ttan:
-            result += "tan";
-            break;
-        case TokenType::Tcot:
-            result += "cot";
-            break;
-        case TokenType::Tlog:
-            result += "log";
-            break;
-        case TokenType::Tplus:
-            result += "plus";
-            break;
-        case TokenType::Tminus:
-            result += "minus";
-            break;
-        case TokenType::Tmult:
-            result += "mult";
-            break;
-        case TokenType::Tdiv:
-            result += "div";
-            break;
-        case TokenType::Tpow:
-            result += "pow";
-            break;
-        case TokenType::TlParen:
-            result += "lParen";
-            break;
-        case TokenType::TrParen:
-            result += "rParen";
-            break;
-        case TokenType::TENDOFFILE:
-            result += "ENDOFFILE";
-            break;
-        default:
-            throw "Unknown token";
-        }
-        result += "\n";
+string tokenTypeToStr(TokenType t) {
+    switch (t) {
+    case TokenType::Tconstant:
+        return "constant";
+    case TokenType::Tvariable:
+        return "variable";
+    case TokenType::Tsin:
+        return "sin";
+    case TokenType::Tcos:
+        return "cos";
+    case TokenType::Ttan:
+        return "tan";
+    case TokenType::Tcot:
+        return "cot";
+    case TokenType::Tlog:
+        return "log";
+    case TokenType::Tplus:
+        return "plus";
+    case TokenType::Tminus:
+        return "minus";
+    case TokenType::Tmult:
+        return "mult";
+    case TokenType::Tdiv:
+        return "div";
+    case TokenType::Tpow:
+        return "pow";
+    case TokenType::TlParen:
+        return "lParen";
+    case TokenType::TrParen:
+        return "rParen";
+    case TokenType::TENDOFFILE:
+        return "ENDOFFILE";
+    default:
+        throw "Unknown Token";
     }
-    return result;
+}
+
+string tokenVecToString(const vector<Token> tokens) {
+    string ret = "";
+    for (const Token& tok : tokens) {
+        ret += tokenTypeToStr(tok.type);
+        if (tok.type == TokenType::Tconstant) {
+            ret += " " + double_to_str(tok.value);
+        }
+        ret += "\n";
+    }
+    return ret;
+}
+
+string parseTreeToString(const Node* root) {
+    switch (root->type) {
+    case NodeType::variable:
+        return "variable";
+    case NodeType::constant:
+        return double_to_str(root->value);
+    case NodeType::funcCall:
+        return tokenTypeToStr(root->tokType) + "(" + parseTreeToString(root->a) + ")";
+    case NodeType::binaryExpr:
+        return "{" + parseTreeToString(root->a) + tokenTypeToStr(root->tokType) + parseTreeToString(root->b) + "}";
+    default:
+        throw "Unknown Node";
+    }
 }
 
 template <typename T>
@@ -258,25 +366,25 @@ int main() {
         TestSuit<string> s("Lexer");
 
         s.isEq(
-            TokenVecToString(Lexer("421").lex()),
+            tokenVecToString(Lexer("421").lex()),
             "constant 421\nENDOFFILE\n",
             "integer number");
         s.isEq(
-            TokenVecToString(Lexer("301.875").lex()),
+            tokenVecToString(Lexer("301.875").lex()),
             "constant 301.875\nENDOFFILE\n",
             "rational number");
         s.isEq(
-            TokenVecToString(Lexer("sin cos + tan cot 10 ^ log x").lex()),
+            tokenVecToString(Lexer("sin cos + tan cot 10 ^ log x").lex()),
             "sin\ncos\nplus\ntan\ncot\nconstant 10\npow\nlog\nvariable\nENDOFFILE\n",
             "functions with variables and contants");
         s.isEq(
-            TokenVecToString(Lexer("7+ cos(2 + x) ^2* 3 - 5.234").lex()),
+            tokenVecToString(Lexer("7+ cos(2 + x) ^2* 3 - 5.234").lex()),
             "constant 7\nplus\ncos\nlParen\nconstant 2\nplus\nvariable\nrParen\npow\nconstant 2\nmult\nconstant 3\nminus\nconstant 5.234\nENDOFFILE\n",
             "full math expr");
 
         bool error = false;
         try {
-            TokenVecToString(Lexer("2 + e").lex());
+            tokenVecToString(Lexer("2 + e").lex());
         } catch (exception e) {
             cout << e.what();
             error = true;
@@ -290,10 +398,10 @@ int main() {
         }
 
         /*s.isError(
-            TokenVecToString(Lexer("2 + e").lex()),
+            tokenVecToString(Lexer("2 + e").lex()),
             "illegal char");
         s.isError(
-            TokenVecToString(Lexer("sincos 2").lex()),
+            tokenVecToString(Lexer("sincos 2").lex()),
             "no space between functions");*/
     }
 
