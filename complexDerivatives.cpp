@@ -159,7 +159,7 @@ public:
 };
 
 enum NodeType {
-    binaryExpr,
+    binaryOp,
     funcCall,
     variable,
     constant
@@ -188,7 +188,7 @@ private:
             TokenType tokType = toks[pos].type;
             ++pos;
             Node* b = term();
-            a = new Node{ NodeType::binaryExpr, tokType, 0, a, b }; 
+            a = new Node{ NodeType::binaryOp, tokType, 0, a, b }; 
         }
         return a;
     }
@@ -200,7 +200,7 @@ private:
             TokenType tokType = toks[pos].type;
             ++pos;
             Node* b = factor();
-            a = new Node{ NodeType::binaryExpr, tokType, 0, a, b };
+            a = new Node{ NodeType::binaryOp, tokType, 0, a, b };
         }
         return a;
     }
@@ -211,7 +211,7 @@ private:
             TokenType tokType = toks[pos].type;
             ++pos;
             Node* b = basic();
-            a = new Node{ NodeType::binaryExpr, tokType, 0, a, b };
+            a = new Node{ NodeType::binaryOp, tokType, 0, a, b };
         }
         return a;
     }
@@ -269,6 +269,37 @@ public:
         return expr();
     }
 };
+
+Node* diff(Node* root) {
+    switch (root->type) {
+    case NodeType::constant:
+        return new Node{ NodeType::constant, TokenType::Tconstant, 0, nullptr, nullptr };
+    case NodeType::variable:
+        return new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
+    case NodeType::funcCall:
+        switch (root->tokType) {
+        case TokenType::Tsin:
+        case TokenType::Tcos:
+        case TokenType::Ttan:
+        case TokenType::Tcot:
+        case TokenType::Tlog:
+        default:
+            throw "Diff error: unknows funcCall TokenType";
+        }
+    case NodeType::binaryOp:
+        switch (root->tokType) {
+        case TokenType::Tplus:
+        case TokenType::Tminus:
+        case TokenType::Tmult:
+        case TokenType::Tdiv:
+        case TokenType::Tpow:
+        default:
+            throw "Diff error: unknows binaryOp TokenType";
+        }
+    default:
+        throw "Diff error: unknows NodeType";
+    }
+}
 
 // For testing
 
@@ -340,7 +371,7 @@ string parseTreeToString(const Node* root) {
         return double_to_str(root->value);
     case NodeType::funcCall:
         return tokenTypeToStr(root->tokType) + "(" + parseTreeToString(root->a) + ")";
-    case NodeType::binaryExpr:
+    case NodeType::binaryOp:
         return "{" + parseTreeToString(root->a) + tokenTypeToStr(root->tokType) + parseTreeToString(root->b) + "}";
     default:
         throw "Unknown Node";
