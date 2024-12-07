@@ -20,6 +20,8 @@ tuple<func_t, func_t, func_t> differentiate(const string& eq) {
     };
 }
 
+// TODO: In the future more functions can be supported, like arcsin or coseant
+
 enum TokenType {
     Tconstant,
     Tvariable,
@@ -281,72 +283,168 @@ Node* diff(Node* root) {
         Node* res = new Node{ NodeType::binaryOp, TokenType::Tmult, 0, diff(root->a), nullptr };
         switch (root->tokType) {
         case TokenType::Tsin:
+        {
             res->b = new Node{ NodeType::funcCall, TokenType::Tcos, 0,
                 root->a,
                 nullptr
             };
+        }
             break;
         case TokenType::Tcos:
-            res->b = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
-                nullptr,
+        {
+            Node* minusOne = new Node{ NodeType::constant, TokenType::Tconstant, -1, nullptr, nullptr };
+            Node* sinFunc = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
+                root->a,
                 nullptr
             };
-            res->b->a = new Node{ NodeType::constant, TokenType::Tconstant, -1, nullptr, nullptr };
-            res->b->b = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
-                root->a,
-                nullptr };
+            res->b = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                minusOne,
+                sinFunc
+            };
+        }
             break;
         case TokenType::Ttan:
-            res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
-                nullptr,
-                nullptr
-            };
-            res->b->a = new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
-            res->b->b = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
-                nullptr,
-                nullptr
-            };
-            res->b->b->a = new Node{ NodeType::funcCall, TokenType::Tcos, 0,
+        {
+            Node* one = new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
+            Node* cosFunc = new Node{ NodeType::funcCall, TokenType::Tcos, 0,
                 root->a,
                 nullptr
             };
-            res->b->b->b = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            Node* two = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            Node* powBinOp = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
+                cosFunc,
+                two
+            };
+            res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
+                one,
+                powBinOp
+            };
+        }
             break;
         case TokenType::Tcot:
-            res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
-                nullptr,
-                nullptr
-            };
-            res->b->a = new Node{ NodeType::constant, TokenType::Tconstant, -1, nullptr, nullptr };
-            res->b->b = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
-                nullptr,
-                nullptr
-            };
-            res->b->b->a = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
+        {
+            Node* minusOne = new Node{ NodeType::constant, TokenType::Tconstant, -1, nullptr, nullptr };
+            Node* sinFunc = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
                 root->a,
                 nullptr
             };
-            res->b->b->b = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            Node* two = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            Node* powBinOp = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
+                sinFunc,
+                two
+            };
+            res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
+                minusOne,
+                powBinOp
+            };
+        }
             break;
         case TokenType::Tlog:
+        {
+            Node* one = new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
+            res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
+                one,
+                root->a
+            };
+        }
             break;
         default:
             throw "Diff error: unknows funcCall TokenType";
         }
+        return res;
     }
     case NodeType::binaryOp:
         switch (root->tokType) {
         case TokenType::Tplus:
+            return new Node{ NodeType::binaryOp, TokenType::Tplus, 0,
+                diff(root->a),
+                diff(root->b)
+            };
         case TokenType::Tminus:
+            return new Node{ NodeType::binaryOp, TokenType::Tminus, 0,
+                diff(root->a),
+                diff(root->b)
+            };
         case TokenType::Tmult:
+        {
+            Node* left = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                diff(root->a),
+                root->b
+            };
+            Node* right = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                root->a,
+                diff(root->b)
+            };
+            return new Node{ NodeType::binaryOp, TokenType::Tplus, 0,
+                left,
+                right
+            };
+        }
         case TokenType::Tdiv:
+        {
+            Node* left = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                diff(root->a),
+                root->b
+            };
+            Node* right = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                root->a,
+                diff(root->b)
+            };
+            Node* top = new Node{ NodeType::binaryOp, TokenType::Tminus, 0,
+                left,
+                right
+            };
+            Node* two = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            Node* bottom = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
+                root->b,
+                two
+            };
+            return new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
+                top,
+                bottom
+            };
+        }
         case TokenType::Tpow:
+        {
+            Node* left = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
+                root->a,
+                root->b
+            };
+            Node* logFunc = new Node{ NodeType::funcCall, TokenType::Tlog, 0,
+                root->a,
+                nullptr
+            };
+            Node* innerLeft = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                diff(root->b),
+                logFunc
+            };
+            Node* div = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
+                diff(root->a),
+                root->a
+            };
+            Node* innerRight = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                root->b,
+                div
+            };
+            Node* right = new Node{ NodeType::binaryOp, TokenType::Tplus, 0,
+                innerLeft,
+                innerRight,
+            };
+            return new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                left,
+                right
+            };
+        }
         default:
             throw "Diff error: unknows binaryOp TokenType";
         }
     default:
         throw "Diff error: unknows NodeType";
     }
+}
+
+value_t calc(Node* root) {
+    // implement errors (for example for tan, vot, divBy0)
 }
 
 // For testing
@@ -506,7 +604,8 @@ int main() {
         //cout << parseTreeToString(Parser(Lexer("4+tan(4 * x + log(x))").lex()).parse()) << endl;
         //cout << parseTreeToString(Parser(Lexer("4+tan(4 * x + log(x)").lex()).parse()) << endl; // should throw error
         //cout << parseTreeToString(Parser(Lexer("sin 3 + 4").lex()).parse()) << endl; // should throw error
-        cout << parseTreeToString(Parser(Lexer("sin(cos(tan(cot(log(x + 2)))))").lex()).parse()) << endl; // should throw error
+        //cout << parseTreeToString(Parser(Lexer("sin(cos(tan(cot(log(x + 2)))))").lex()).parse()) << endl;
+        //TODO: make test for power tower (a^b^c)
     }
 
     return 0;
