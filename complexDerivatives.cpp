@@ -182,25 +182,41 @@ private:
     size_t pos;
 
     Node* expr() {
-        Node a{ NodeType::binaryExpr, TokenType::Tunspecified, 0, term(), nullptr };
-        ++pos;
+        //Node a{ NodeType::binaryExpr, TokenType::Tunspecified, 0, term(), nullptr };
+        Node a = *term();
+        //++pos;
         while (toks[pos].type == TokenType::Tplus ||
             toks[pos].type == TokenType::Tminus) {
-            a.tokType = toks[pos].type;
+            a = Node{ NodeType::binaryExpr, toks[pos].type, 0, &a, nullptr };
             ++pos;
             a.b = term();
-            a.a = ;
-            a->
         }
         return &a;
     }
 
     Node* term() {
-
+        //Node a{ NodeType::binaryExpr, TokenType::Tunspecified, 0, term(), nullptr };
+        Node a = *factor();
+        //++pos;
+        while (toks[pos].type == TokenType::Tmult ||
+            toks[pos].type == TokenType::Tdiv) {
+            a = Node{ NodeType::binaryExpr, toks[pos].type, 0, &a, nullptr };
+            ++pos;
+            a.b = factor();
+        }
+        return &a;
     }
 
     Node* factor() {
-
+        //Node a{ NodeType::binaryExpr, TokenType::Tunspecified, 0, term(), nullptr };
+        Node a = *basic();
+        //++pos;
+        while (toks[pos].type == TokenType::Tpow) {
+            a = Node{ NodeType::binaryExpr, toks[pos].type, 0, &a, nullptr };
+            ++pos;
+            a.b = basic();
+        }
+        return &a;
     }
 
     Node* func_call() {
@@ -403,6 +419,10 @@ int main() {
         s.isError(
             tokenVecToString(Lexer("sincos 2").lex()),
             "no space between functions");*/
+    }
+
+    {
+        cout << parseTreeToString(Parser(Lexer("3 + 3 -1").lex()).parse());
     }
 
     return 0;
