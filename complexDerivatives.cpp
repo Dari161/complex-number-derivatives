@@ -209,10 +209,13 @@ private:
 
     Node* factor() {
         Node* a = basic();
-        while (toks[pos].type == TokenType::Tpow) {
+        //while (toks[pos].type == TokenType::Tpow) {
+        if (toks[pos].type == TokenType::Tpow) {
             TokenType tokType = toks[pos].type;
             ++pos;
-            Node* b = basic();
+            //Node* b = basic();
+            // Instead of looping through all ^ operators, the function makes a recursive call when encountering ^. This ensures that the right-hand side (e.g., b^c) is fully parsed before combining it with the left-hand side.
+            Node* b = factor(); // we use recursive call to the right here, because exponentiation operator is right-associative
             a = new Node{ NodeType::binaryOp, tokType, 0, a, b };
         }
         return a;
@@ -445,6 +448,7 @@ Node* diff(Node* root) {
 
 value_t calc(Node* root) {
     // implement errors (for example for tan, vot, divBy0)
+    return 0;
 }
 
 // For testing
@@ -606,6 +610,7 @@ int main() {
         //cout << parseTreeToString(Parser(Lexer("sin 3 + 4").lex()).parse()) << endl; // should throw error
         //cout << parseTreeToString(Parser(Lexer("sin(cos(tan(cot(log(x + 2)))))").lex()).parse()) << endl;
         //TODO: make test for power tower (a^b^c)
+        cout << parseTreeToString(Parser(Lexer("2^3^4^x").lex()).parse()) << endl;
     }
 
     return 0;
