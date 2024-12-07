@@ -277,15 +277,63 @@ Node* diff(Node* root) {
     case NodeType::variable:
         return new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
     case NodeType::funcCall:
+    {
+        Node* res = new Node{ NodeType::binaryOp, TokenType::Tmult, 0, diff(root->a), nullptr };
         switch (root->tokType) {
         case TokenType::Tsin:
+            res->b = new Node{ NodeType::funcCall, TokenType::Tcos, 0,
+                root->a,
+                nullptr
+            };
+            break;
         case TokenType::Tcos:
+            res->b = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
+                nullptr,
+                nullptr
+            };
+            res->b->a = new Node{ NodeType::constant, TokenType::Tconstant, -1, nullptr, nullptr };
+            res->b->b = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
+                root->a,
+                nullptr };
+            break;
         case TokenType::Ttan:
+            res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
+                nullptr,
+                nullptr
+            };
+            res->b->a = new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
+            res->b->b = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
+                nullptr,
+                nullptr
+            };
+            res->b->b->a = new Node{ NodeType::funcCall, TokenType::Tcos, 0,
+                root->a,
+                nullptr
+            };
+            res->b->b->b = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            break;
         case TokenType::Tcot:
+            res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
+                nullptr,
+                nullptr
+            };
+            res->b->a = new Node{ NodeType::constant, TokenType::Tconstant, -1, nullptr, nullptr };
+            res->b->b = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
+                nullptr,
+                nullptr
+            };
+            res->b->b->a = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
+                root->a,
+                nullptr
+            };
+            res->b->b->b = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            break;
         case TokenType::Tlog:
+            break;
         default:
             throw "Diff error: unknows funcCall TokenType";
         }
+    }
     case NodeType::binaryOp:
         switch (root->tokType) {
         case TokenType::Tplus:
