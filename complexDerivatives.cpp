@@ -182,71 +182,68 @@ private:
     size_t pos;
 
     Node* expr() {
-        //Node a{ NodeType::binaryExpr, TokenType::Tunspecified, 0, term(), nullptr };
-        Node a = *term();
-        //++pos;
+        Node* a = term();
         while (toks[pos].type == TokenType::Tplus ||
             toks[pos].type == TokenType::Tminus) {
-            a = Node{ NodeType::binaryExpr, toks[pos].type, 0, &a, nullptr };
+            TokenType tokType = toks[pos].type;
             ++pos;
-            a.b = term();
+            Node* b = term();
+            a = new Node{ NodeType::binaryExpr, tokType, 0, a, b }; 
         }
-        return &a;
+        return a;
     }
 
     Node* term() {
-        //Node a{ NodeType::binaryExpr, TokenType::Tunspecified, 0, term(), nullptr };
-        Node a = *factor();
-        //++pos;
+        Node* a = factor();
         while (toks[pos].type == TokenType::Tmult ||
             toks[pos].type == TokenType::Tdiv) {
-            a = Node{ NodeType::binaryExpr, toks[pos].type, 0, &a, nullptr };
+            TokenType tokType = toks[pos].type;
             ++pos;
-            a.b = factor();
+            Node* b = factor();
+            a = new Node{ NodeType::binaryExpr, tokType, 0, a, b };
         }
-        return &a;
+        return a;
     }
 
     Node* factor() {
-        //Node a{ NodeType::binaryExpr, TokenType::Tunspecified, 0, term(), nullptr };
-        Node a = *basic();
-        //++pos;
+        Node* a = basic();
         while (toks[pos].type == TokenType::Tpow) {
-            a = Node{ NodeType::binaryExpr, toks[pos].type, 0, &a, nullptr };
+            TokenType tokType = toks[pos].type;
             ++pos;
-            a.b = basic();
+            Node* b = basic();
+            a = new Node{ NodeType::binaryExpr, tokType, 0, a, b };
         }
-        return &a;
+        return a;
     }
 
     Node* func_call() {
-        if (!(toks[pos].type == TokenType::Tsin) ||
+        if (!((toks[pos].type == TokenType::Tsin) ||
             (toks[pos].type == TokenType::Tcos) ||
             (toks[pos].type == TokenType::Ttan) ||
             (toks[pos].type == TokenType::Tcot) ||
-            (toks[pos].type == TokenType::Tlog)) {
+            (toks[pos].type == TokenType::Tlog))) {
             throw "Parser error: expected function identifier";
         }
-        Node ret{ NodeType::funcCall, toks[pos].type, 0, nullptr, nullptr };
+        TokenType funcType = toks[pos].type;
         ++pos;
         if (toks[pos].type != TokenType::TlParen) throw "Parser error: expected '(' after function identifier";
         ++pos;
-        ret.a = expr();
+        Node* arg = expr();
         if (toks[pos].type != TokenType::TrParen) throw "Parser error: expected ')' after function argument";
         ++pos;
-        return &ret;
+        return new Node{ NodeType::funcCall, funcType , 0, arg, nullptr };
     }
 
     Node* basic() {
         if (toks[pos].type == TokenType::Tconstant) {
-            Node ret{ NodeType::constant, TokenType::Tconstant, toks[pos].value, nullptr, nullptr };
+            Node* ret = new Node{ NodeType::constant, TokenType::Tconstant, toks[pos].value, nullptr, nullptr };
             ++pos;
-            return &ret;
+            return ret;
         }
         if (toks[pos].type == TokenType::Tvariable) {
-            Node ret{ NodeType::variable, TokenType::Tvariable, 0, nullptr, nullptr};
+            Node* ret = new Node{ NodeType::variable, TokenType::Tvariable, 0, nullptr, nullptr};
             ++pos;
-            return &ret;
+            return ret;
         }
         if ((toks[pos].type == TokenType::Tsin) ||
             (toks[pos].type == TokenType::Tcos) ||
@@ -255,17 +252,18 @@ private:
             (toks[pos].type == TokenType::Tlog)) {
             return func_call();
         }
-
-        if (toks[pos].type != TokenType::TlParen) throw "Parser error: unexpected token";
-        ++pos;
-        Node* ret = expr();
-        if (toks[pos].type != TokenType::TrParen) throw "Parser error: expected ')' after '('";
-        ++pos;
-        return ret;
+        if (toks[pos].type == TokenType::TlParen) {
+            ++pos;
+            Node* ret = expr();
+            if (toks[pos].type != TokenType::TrParen) throw "Parser error: expected ')' after '('";
+            ++pos;
+            return ret;
+        }
+        throw "Parser error: unexpected token";
     }
 
 public:
-    Parser(vector<Token> tokens) : toks(tokens), pos(0) {}
+    Parser(const vector<Token>& tokens) : toks(tokens), pos(0) {}
 
     Node* parse() {
         return expr();
@@ -422,7 +420,14 @@ int main() {
     }
 
     {
-        cout << parseTreeToString(Parser(Lexer("3 + 3 -1").lex()).parse());
+        //cout << parseTreeToString(Parser(Lexer("3 + 3 -1").lex()).parse()) << endl;
+        //cout << parseTreeToString(Parser(Lexer("5 + 32 * 2").lex()).parse()) << endl;
+        //cout << parseTreeToString(Parser(Lexer("4* (3+11)").lex()).parse()) << endl;
+        //cout << parseTreeToString(Parser(Lexer("sin(4 * x + 2)").lex()).parse()) << endl;
+        //cout << parseTreeToString(Parser(Lexer("4+tan(4 * x + log(x))").lex()).parse()) << endl;
+        //cout << parseTreeToString(Parser(Lexer("4+tan(4 * x + log(x)").lex()).parse()) << endl; // should throw error
+        //cout << parseTreeToString(Parser(Lexer("sin 3 + 4").lex()).parse()) << endl; // should throw error
+        cout << parseTreeToString(Parser(Lexer("sin(cos(tan(cot(log(x + 2)))))").lex()).parse()) << endl; // should throw error
     }
 
     return 0;
