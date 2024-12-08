@@ -101,7 +101,7 @@ private:
     int parenBalance = 0;
 
 public:
-    Lexer(const string& eq) : eq(eq), pos(0) {}
+    Lexer(const string& eq) : eq(eq), pos(0) { }
 
     vector<Token> lex() {
         vector<Token> res;
@@ -582,6 +582,31 @@ string tokenTypeToStr(TokenType t) {
     }
 }
 
+char tokenTypeToSymbol(TokenType t) {
+    switch (t) {
+    case TokenType::Tconst:
+        return 'c';
+    case TokenType::Tvariable:
+        return VARIABLE;
+    case TokenType::Tplus:
+        return '+';
+    case TokenType::Tminus:
+        return '-';
+    case TokenType::Tmult:
+        return '*';
+    case TokenType::Tdiv:
+        return '/';
+    case TokenType::Tpow:
+        return '^';
+    case TokenType::TlParen:
+        return '(';
+    case TokenType::TrParen:
+        return ')';
+    default:
+        throw "Unknown Token or token cannot be represented by a symbol (for example funtions or TEND TokenType)";
+    }
+}
+
 string tokenVecToString(const vector<Token> tokens) {
     string ret = "";
     for (const Token& tok : tokens) {
@@ -597,13 +622,13 @@ string tokenVecToString(const vector<Token> tokens) {
 string parseTreeToString(const Node* root) {
     switch (root->type) {
     case NodeType::variable:
-        return "variable";
+        return string("") + VARIABLE; // convert char to string
     case NodeType::constant:
         return double_to_str(root->value);
     case NodeType::funcCall:
         return tokenTypeToStr(root->tokType) + "(" + parseTreeToString(root->a) + ")";
     case NodeType::binaryOp:
-        return "{" + parseTreeToString(root->a) + tokenTypeToStr(root->tokType) + parseTreeToString(root->b) + "}";
+        return "{" + parseTreeToString(root->a) + tokenTypeToSymbol(root->tokType) + parseTreeToString(root->b) + "}";
     default:
         throw "Unknown Node";
     }
@@ -692,6 +717,7 @@ int main() {
         //cout << parseTreeToString(Parser(Lexer("sin 3 + 4").lex()).parse()) << endl; // should throw error
         cout << parseTreeToString(Parser(Lexer("sin(cos(tan(cot(log(x + 2)))))").lex()).parse()) << endl;
         cout << parseTreeToString(Parser(Lexer("2^3^4^x").lex()).parse()) << endl; // 2^(3^(4^x)))
+        cout << parseTreeToString(Parser(Lexer("2^3*5").lex()).parse()) << endl; // (2^3) + 5
         
         //cout << parseTreeToString(Parser(Lexer("3+x+2x").lex()).parse()) << endl; // should throw error
         //cout << parseTreeToString(Parser(Lexer("3x+2+x").lex()).parse()) << endl; // should throw error
@@ -725,10 +751,9 @@ int main() {
         cout << parseTreeToString(diff(Parser(Lexer("sin(3*x)").lex()).parse())) << endl;
         cout << parseTreeToString(diff(Parser(Lexer("tan(sin(x+3)+x)").lex()).parse())) << endl;
         cout << parseTreeToString(diff(Parser(Lexer("cot(log(x+9)+3*x)").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("sin(cos(3*x))").lex()).parse())) << endl;
 
         //cout << parseTreeToString(diff(Parser(Lexer("3*x + 2x").lex()).parse())) << endl; // should throw error
-
-        // TODO: test errors too
 
     }
 
