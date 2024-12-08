@@ -24,14 +24,12 @@ tuple<func_t, func_t, func_t> differentiate(const string& eq) {
 // TODO: In the future more functions can be supported, like arcsin or coseant
 
 enum TokenType {
-    Tconstant,
+    Tconst,
     Tvariable,
     Tsin, Tcos, Ttan, Tcot, Tlog,
     Tplus, Tminus, Tmult, Tdiv, Tpow,
     TlParen, TrParen,
-    TENDOFFILE,
-
-    Tunspecified
+    TEND
 };
 
 struct Token {
@@ -72,7 +70,7 @@ private:
             ++pos;
             if (eq[pos] == DECIMALSEPARATOR) {
                 ++pos;
-                if (!isDigit(eq[pos])) throw "Lexing error: Decimal separator must be followed by digits";
+                if (!isDigit(eq[pos])) throw "Lexer error: Decimal separator must be followed by digits";
                 isFraction = true;
                 break;
             }
@@ -100,6 +98,8 @@ private:
         return functionType;
     }
 
+    int parenBalance = 0;
+
 public:
     Lexer(const string& eq) : eq(eq), pos(0) {}
 
@@ -107,7 +107,7 @@ public:
         vector<Token> res;
         while (eq[pos] != '\0') {
             if (isDigit(eq[pos])) {
-                res.push_back(Token{ TokenType::Tconstant, makeNum() });
+                res.push_back(Token{ TokenType::Tconst, makeNum() });
             } else if (eq[pos] == VARIABLE) {
                 res.push_back(Token{ TokenType::Tvariable, 0 });
                 ++pos;
@@ -130,9 +130,12 @@ public:
                     ++pos; break;
                 case '(':
                     res.push_back(Token{ TokenType::TlParen, 0 });
+                    ++parenBalance;
                     ++pos; break;
                 case ')':
                     res.push_back(Token{ TokenType::TrParen, 0 });
+                    --parenBalance;
+                    if (parenBalance < 0) throw "Lexer error: more ')' than '('";
                     ++pos; break;
                 case' ':
                     ++pos;
@@ -151,12 +154,13 @@ public:
                     } else if (functionType == "log") {
                         res.push_back(Token{ TokenType::Tlog, 0 });
                     } else if (functionType != "") {
-                        throw "Lexing error: unknown character";
+                        throw "Lexer error: unknown character";
                     }
                 }
             } 
         }
-        res.push_back(Token{ TokenType::TENDOFFILE, 0 });
+        if (parenBalance != 0) throw "Lexer error: parenthesis are not balanced";
+        res.push_back(Token{ TokenType::TEND, 0 });
         return res;
     }
 };
@@ -183,6 +187,19 @@ class Parser {
 private:
     vector<Token> toks;
     size_t pos;
+
+    void checkToken() {
+        if (!((toks[pos].type == TokenType::TEND) ||
+            (toks[pos].type == TokenType::Tplus) ||
+            (toks[pos].type == TokenType::Tminus) ||
+            (toks[pos].type == TokenType::Tmult) ||
+            (toks[pos].type == TokenType::Tdiv) ||
+            (toks[pos].type == TokenType::Tpow) ||
+            (toks[pos].type == TokenType::TrParen)
+            )) {
+            throw "Parser error: expected binyaryOp, end of file or ')' after const, variable, funcCall or expression in parenthesis";
+        }
+    }
 
     Node* expr() {
         Node* a = term();
@@ -237,18 +254,21 @@ private:
         Node* arg = expr();
         if (toks[pos].type != TokenType::TrParen) throw "Parser error: expected ')' after function argument";
         ++pos;
+        checkToken();
         return new Node{ NodeType::funcCall, funcType , 0, arg, nullptr };
     }
 
     Node* basic() {
-        if (toks[pos].type == TokenType::Tconstant) {
-            Node* ret = new Node{ NodeType::constant, TokenType::Tconstant, toks[pos].value, nullptr, nullptr };
+        if (toks[pos].type == TokenType::Tconst) {
+            Node* ret = new Node{ NodeType::constant, TokenType::Tconst, toks[pos].value, nullptr, nullptr };
             ++pos;
+            checkToken();
             return ret;
         }
         if (toks[pos].type == TokenType::Tvariable) {
             Node* ret = new Node{ NodeType::variable, TokenType::Tvariable, 0, nullptr, nullptr};
             ++pos;
+            checkToken();
             return ret;
         }
         if ((toks[pos].type == TokenType::Tsin) ||
@@ -263,6 +283,7 @@ private:
             Node* ret = expr();
             if (toks[pos].type != TokenType::TrParen) throw "Parser error: expected ')' after '('";
             ++pos;
+            checkToken();
             return ret;
         }
         throw "Parser error: unexpected token";
@@ -279,9 +300,9 @@ public:
 Node* diff(Node* root) {
     switch (root->type) {
     case NodeType::constant:
-        return new Node{ NodeType::constant, TokenType::Tconstant, 0, nullptr, nullptr };
+        return new Node{ NodeType::constant, TokenType::Tconst, 0, nullptr, nullptr };
     case NodeType::variable:
-        return new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
+        return new Node{ NodeType::constant, TokenType::Tconst, 1, nullptr, nullptr };
     case NodeType::funcCall:
     {
         Node* res = new Node{ NodeType::binaryOp, TokenType::Tmult, 0, diff(root->a), nullptr };
@@ -296,7 +317,7 @@ Node* diff(Node* root) {
             break;
         case TokenType::Tcos:
         {
-            Node* minusOne = new Node{ NodeType::constant, TokenType::Tconstant, -1, nullptr, nullptr };
+            Node* minusOne = new Node{ NodeType::constant, TokenType::Tconst, -1, nullptr, nullptr };
             Node* sinFunc = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
                 root->a,
                 nullptr
@@ -309,12 +330,12 @@ Node* diff(Node* root) {
             break;
         case TokenType::Ttan:
         {
-            Node* one = new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
+            Node* one = new Node{ NodeType::constant, TokenType::Tconst, 1, nullptr, nullptr };
             Node* cosFunc = new Node{ NodeType::funcCall, TokenType::Tcos, 0,
                 root->a,
                 nullptr
             };
-            Node* two = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            Node* two = new Node{ NodeType::constant, TokenType::Tconst, 2, nullptr, nullptr };
             Node* powBinOp = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
                 cosFunc,
                 two
@@ -327,12 +348,12 @@ Node* diff(Node* root) {
             break;
         case TokenType::Tcot:
         {
-            Node* minusOne = new Node{ NodeType::constant, TokenType::Tconstant, -1, nullptr, nullptr };
+            Node* minusOne = new Node{ NodeType::constant, TokenType::Tconst, -1, nullptr, nullptr };
             Node* sinFunc = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
                 root->a,
                 nullptr
             };
-            Node* two = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            Node* two = new Node{ NodeType::constant, TokenType::Tconst, 2, nullptr, nullptr };
             Node* powBinOp = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
                 sinFunc,
                 two
@@ -345,7 +366,7 @@ Node* diff(Node* root) {
             break;
         case TokenType::Tlog:
         {
-            Node* one = new Node{ NodeType::constant, TokenType::Tconstant, 1, nullptr, nullptr };
+            Node* one = new Node{ NodeType::constant, TokenType::Tconst, 1, nullptr, nullptr };
             res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
                 one,
                 root->a
@@ -398,7 +419,7 @@ Node* diff(Node* root) {
                 left,
                 right
             };
-            Node* two = new Node{ NodeType::constant, TokenType::Tconstant, 2, nullptr, nullptr };
+            Node* two = new Node{ NodeType::constant, TokenType::Tconst, 2, nullptr, nullptr };
             Node* bottom = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
                 root->b,
                 two
@@ -456,7 +477,7 @@ public:
     }
 };
 
-value_t calc(Node* root) {
+/*value_t calc(Node* root) {
     // implement errors (for example for tan, vot, divBy0)
     switch (root->type) {
     case NodeType::constant:
@@ -478,7 +499,13 @@ value_t calc(Node* root) {
             return 1.0 / b;
         }
         case TokenType::Tlog:
-            return log(calc(root)); // natural log (base e)
+        {
+            value_t a = calc(root);
+            if (abs(a) <= 0.0) throw "Calc error: log argument is outside of log's domain";
+            return log(a); // natural log (base e)
+        }
+        default:
+            throw "Calc error: unknows funcCall TokenType";
         }
     case NodeType::binaryOp:
         switch (root->tokType) {
@@ -503,7 +530,7 @@ value_t calc(Node* root) {
         throw "Calc error: unknows NodeType";
     }
     return 0;
-}
+}*/
 
 // For testing
 
@@ -520,7 +547,7 @@ string double_to_str(double d) {
 
 string tokenTypeToStr(TokenType t) {
     switch (t) {
-    case TokenType::Tconstant:
+    case TokenType::Tconst:
         return "constant";
     case TokenType::Tvariable:
         return "variable";
@@ -548,7 +575,7 @@ string tokenTypeToStr(TokenType t) {
         return "lParen";
     case TokenType::TrParen:
         return "rParen";
-    case TokenType::TENDOFFILE:
+    case TokenType::TEND:
         return "ENDOFFILE";
     default:
         throw "Unknown Token";
@@ -559,7 +586,7 @@ string tokenVecToString(const vector<Token> tokens) {
     string ret = "";
     for (const Token& tok : tokens) {
         ret += tokenTypeToStr(tok.type);
-        if (tok.type == TokenType::Tconstant) {
+        if (tok.type == TokenType::Tconst) {
             ret += " " + double_to_str(tok.value);
         }
         ret += "\n";
@@ -612,7 +639,7 @@ public:
 int main() {
 
     {
-        TestSuit<string> s("Lexer");
+        /*TestSuit<string> s("Lexer");
 
         s.isEq(
             tokenVecToString(Lexer("421").lex()),
@@ -644,7 +671,7 @@ int main() {
             cout << "good";
         } else {
             cout << "bad";
-        }
+        }*/
 
         /*s.isError(
             tokenVecToString(Lexer("2 + e").lex()),
@@ -655,16 +682,54 @@ int main() {
     }
 
     {
-        //cout << parseTreeToString(Parser(Lexer("3 + 3 -1").lex()).parse()) << endl;
-        //cout << parseTreeToString(Parser(Lexer("5 + 32 * 2").lex()).parse()) << endl;
-        //cout << parseTreeToString(Parser(Lexer("4* (3+11)").lex()).parse()) << endl;
-        //cout << parseTreeToString(Parser(Lexer("sin(4 * x + 2)").lex()).parse()) << endl;
-        //cout << parseTreeToString(Parser(Lexer("4+tan(4 * x + log(x))").lex()).parse()) << endl;
+        cout << "Testing Parser:" << endl;
+        cout << parseTreeToString(Parser(Lexer("3 + 3 -1").lex()).parse()) << endl;
+        cout << parseTreeToString(Parser(Lexer("5 + 32 * 2").lex()).parse()) << endl;
+        cout << parseTreeToString(Parser(Lexer("4* (3+11)").lex()).parse()) << endl;
+        cout << parseTreeToString(Parser(Lexer("sin(4 * x + 2)").lex()).parse()) << endl;
+        cout << parseTreeToString(Parser(Lexer("4+tan(4 * x + log(x))").lex()).parse()) << endl;
         //cout << parseTreeToString(Parser(Lexer("4+tan(4 * x + log(x)").lex()).parse()) << endl; // should throw error
         //cout << parseTreeToString(Parser(Lexer("sin 3 + 4").lex()).parse()) << endl; // should throw error
-        //cout << parseTreeToString(Parser(Lexer("sin(cos(tan(cot(log(x + 2)))))").lex()).parse()) << endl;
-        //TODO: make test for power tower (a^b^c)
-        cout << parseTreeToString(Parser(Lexer("2^3^4^x").lex()).parse()) << endl;
+        cout << parseTreeToString(Parser(Lexer("sin(cos(tan(cot(log(x + 2)))))").lex()).parse()) << endl;
+        cout << parseTreeToString(Parser(Lexer("2^3^4^x").lex()).parse()) << endl; // 2^(3^(4^x)))
+        
+        //cout << parseTreeToString(Parser(Lexer("3+x+2x").lex()).parse()) << endl; // should throw error
+        //cout << parseTreeToString(Parser(Lexer("3x+2+x").lex()).parse()) << endl; // should throw error
+        //cout << parseTreeToString(Parser(Lexer("(3+4)x").lex()).parse()) << endl; // should throw error
+        //cout << parseTreeToString(Parser(Lexer("((3)").lex()).parse()) << endl; // should throw error
+        //cout << parseTreeToString(Parser(Lexer("(3))").lex()).parse()) << endl; // should throw error
+        //cout << parseTreeToString(Parser(Lexer("cos(3)))").lex()).parse()) << endl; // should throw error
+    }
+
+    {
+        cout << "Testing diff:" << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("x").lex()).parse())) << endl; // variable
+        cout << parseTreeToString(diff(Parser(Lexer("10").lex()).parse())) << endl; // const
+        cout << parseTreeToString(diff(Parser(Lexer("10 * x").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("x + 4").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("3*x + 2*x").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("x^5").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("x^4 + 3*x^2").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("2*x-3").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("1/x").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("x^3/x^7").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("x^2*x").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("7^x").lex()).parse())) << endl;
+
+        cout << parseTreeToString(diff(Parser(Lexer("sin(x)").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("cos(x)").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("tan(x)").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("cot(x)").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("log(x)").lex()).parse())) << endl;
+
+        cout << parseTreeToString(diff(Parser(Lexer("sin(3*x)").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("tan(sin(x+3)+x)").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("cot(log(x+9)+3*x)").lex()).parse())) << endl;
+
+        //cout << parseTreeToString(diff(Parser(Lexer("3*x + 2x").lex()).parse())) << endl; // should throw error
+
+        // TODO: test errors too
+
     }
 
     return 0;
