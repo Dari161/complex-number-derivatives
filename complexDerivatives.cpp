@@ -101,7 +101,7 @@ private:
     int parenBalance = 0;
 
 public:
-    Lexer(const string& eq) : eq(eq), pos(0) { }
+    Lexer(const string& eq) : eq(eq), pos(0) {}
 
     vector<Token> lex() {
         vector<Token> res;
@@ -470,67 +470,63 @@ Node* diff(Node* root) {
 
 class Calculator {
 private:
-    //behelettseit;
+    value_t substitutionValue;
 public:
-    Calculator() {
-        
+    Calculator(value_t substitutionValue) : substitutionValue(substitutionValue) {}
+    
+    value_t calc(Node* root) {
+        switch (root->type) {
+        case NodeType::constant:
+            return root->value;
+        case NodeType::variable:
+            return;
+        case NodeType::funcCall:
+            switch (root->tokType) {
+            case TokenType::Tsin:
+                return sin(calc(root));
+            case TokenType::Tcos:
+                return cos(calc(root));
+            case TokenType::Ttan:
+                return tan(calc(root)); // tangent never throws an error: tan(pi/2) should be undefined, but due to rounding we can never put pi/2 as ab argument
+            case TokenType::Tcot:
+            {
+                value_t b = tan(calc(root));
+                if (b == 0.0) throw "Calc error: division by 0 (cot = 1 / tan)";
+                return 1.0 / b;
+            }
+            case TokenType::Tlog:
+            {
+                value_t a = calc(root);
+                if (abs(a) <= 0.0) throw "Calc error: log argument is outside of log's domain";
+                return log(a); // natural log (base e)
+            }
+            default:
+                throw "Calc error: unknows funcCall TokenType";
+            }
+        case NodeType::binaryOp:
+            switch (root->tokType) {
+            case TokenType::Tplus:
+                return calc(root->a) + calc(root->b);
+            case TokenType::Tminus:
+                return calc(root->a) - calc(root->b);
+            case TokenType::Tmult:
+                return calc(root->a) * calc(root->b);
+            case TokenType::Tdiv:
+            {
+                value_t b = calc(root->b);
+                if (b == 0.0) throw "Calc error: division by 0";
+                return calc(root->a) / b;
+            }
+            case TokenType::Tpow:
+                return pow(calc(root->a), calc(root->b));
+            default:
+                throw "Calc error: unknows binaryOp TokenType";
+            }
+        default:
+            throw "Calc error: unknows NodeType";
+        }
     }
 };
-
-/*value_t calc(Node* root) {
-    // implement errors (for example for tan, vot, divBy0)
-    switch (root->type) {
-    case NodeType::constant:
-        return root->value;
-    case NodeType::variable:
-        return;
-    case NodeType::funcCall:
-        switch (root->tokType) {
-        case TokenType::Tsin:
-            return sin(calc(root));
-        case TokenType::Tcos:
-            return cos(calc(root));
-        case TokenType::Ttan:
-            return tan(calc(root)); // tangent never throws an error: tan(pi/2) should be undefined, but due to rounding we can never put pi/2 as ab argument
-        case TokenType::Tcot:
-        {
-            value_t b = tan(calc(root));
-            if (b == 0.0) throw "Calc error: division by 0 (cot = 1 / tan)";
-            return 1.0 / b;
-        }
-        case TokenType::Tlog:
-        {
-            value_t a = calc(root);
-            if (abs(a) <= 0.0) throw "Calc error: log argument is outside of log's domain";
-            return log(a); // natural log (base e)
-        }
-        default:
-            throw "Calc error: unknows funcCall TokenType";
-        }
-    case NodeType::binaryOp:
-        switch (root->tokType) {
-        case TokenType::Tplus:
-            return calc(root->a) + calc(root->b);
-        case TokenType::Tminus:
-            return calc(root->a) - calc(root->b);
-        case TokenType::Tmult:
-            return calc(root->a) * calc(root->b);
-        case TokenType::Tdiv:
-        {
-            value_t b = calc(root->b);
-            if (b == 0.0) throw "Calc error: division by 0";
-            return calc(root->a) / b;
-        }
-        case TokenType::Tpow:
-            return pow(calc(root->a), calc(root->b));
-        default:
-            throw "Calc error: unknows binaryOp TokenType";
-        }
-    default:
-        throw "Calc error: unknows NodeType";
-    }
-    return 0;
-}*/
 
 // For testing
 
