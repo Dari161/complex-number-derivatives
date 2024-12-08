@@ -13,15 +13,7 @@ using namespace std;
 using value_t = complex<double>;
 using func_t = function<value_t(value_t)>;
 
-tuple<func_t, func_t, func_t> differentiate(const string& eq) {
-    return {
-        [](value_t) { return 0; },
-        [](value_t) { return 0; },
-        [](value_t) { return 0; }
-    };
-}
-
-// TODO: In the future more functions can be supported, like arcsin or coseant
+// TODO: In the future more functions can be supported, like arcsin or cosecant
 
 enum TokenType {
     Tconst,
@@ -33,7 +25,7 @@ enum TokenType {
 };
 
 struct Token {
-    TokenType type;
+    TokenType type; // only used for constants
     double value; // ints are converted to doubles too
 };
 
@@ -42,9 +34,6 @@ const char DECIMALSEPARATOR = '.';
 
 class Lexer {
 private:
-    /*const vector<string> functionNames{
-        "sin", "cos", "tan", "cot", "log"
-    };*/
 
     string eq;
     size_t pos;
@@ -177,10 +166,10 @@ struct Node {
     
     TokenType tokType;
 
-    double value;
+    double value; // only used for constants
 
-    Node* a;
-    Node* b;
+    Node* a; // used for left-hand-side of binary operations and for input argument of functions
+    Node* b; // used for right-hand-side of binary operations
 };
 
 class Parser {
@@ -479,29 +468,29 @@ public:
         case NodeType::constant:
             return root->value;
         case NodeType::variable:
-            return;
+            return substitutionValue;
         case NodeType::funcCall:
             switch (root->tokType) {
             case TokenType::Tsin:
-                return sin(calc(root));
+                return sin(calc(root->a));
             case TokenType::Tcos:
-                return cos(calc(root));
+                return cos(calc(root->a));
             case TokenType::Ttan:
-                return tan(calc(root)); // tangent never throws an error: tan(pi/2) should be undefined, but due to rounding we can never put pi/2 as ab argument
+                return tan(calc(root->a)); // tangent never throws an error: tan(pi/2) should be undefined, but due to rounding we can never put pi/2 as ab argument
             case TokenType::Tcot:
             {
-                value_t b = tan(calc(root));
-                if (b == 0.0) throw "Calc error: division by 0 (cot = 1 / tan)";
-                return 1.0 / b;
+                value_t tanValue = tan(calc(root->a));
+                if (tanValue == 0.0) throw "Calculator error: division by 0 (cot = 1 / tan)";
+                return 1.0 / tanValue;
             }
             case TokenType::Tlog:
             {
-                value_t a = calc(root);
-                if (abs(a) <= 0.0) throw "Calc error: log argument is outside of log's domain";
+                value_t a = calc(root->a);
+                if (abs(a) <= 0.0) throw "Calculator error: log argument is outside of log's domain";
                 return log(a); // natural log (base e)
             }
             default:
-                throw "Calc error: unknows funcCall TokenType";
+                throw "Calculator error: unknows funcCall TokenType";
             }
         case NodeType::binaryOp:
             switch (root->tokType) {
@@ -514,19 +503,47 @@ public:
             case TokenType::Tdiv:
             {
                 value_t b = calc(root->b);
-                if (b == 0.0) throw "Calc error: division by 0";
+                if (b == 0.0) throw "Calculator error: division by 0";
                 return calc(root->a) / b;
             }
             case TokenType::Tpow:
                 return pow(calc(root->a), calc(root->b));
             default:
-                throw "Calc error: unknows binaryOp TokenType";
+                throw "Calculator error: unknows binaryOp TokenType";
             }
         default:
-            throw "Calc error: unknows NodeType";
+            throw "Calculator error: unknows NodeType";
         }
     }
 };
+
+tuple<func_t, func_t, func_t> differentiate(const string& eq) {
+
+    Lexer myLexer(eq);
+    vector<Token> myTokens = myLexer.lex();
+
+    Parser myParser(myTokens);
+    Node* eqTree = myParser.parse(); // build abstract syntax tree
+
+    Node* firstDiffTree = diff(eqTree);
+
+    Node* secondDiffTree = diff(firstDiffTree);
+
+    return {
+        [eqTree](value_t substitutionValue) {
+            Calculator myCalculator(substitutionValue);
+            return myCalculator.calc(eqTree);
+        },
+        [firstDiffTree](value_t substitutionValue) {
+            Calculator myCalculator(substitutionValue);
+            return myCalculator.calc(firstDiffTree);
+        },
+        [secondDiffTree](value_t substitutionValue) {
+            Calculator myCalculator(substitutionValue);
+            return myCalculator.calc(secondDiffTree);
+        }
+    };
+}
 
 // For testing
 
@@ -572,7 +589,7 @@ string tokenTypeToStr(TokenType t) {
     case TokenType::TrParen:
         return "rParen";
     case TokenType::TEND:
-        return "ENDOFFILE";
+        return "ENDTOKEN";
     default:
         throw "Unknown Token";
     }
@@ -603,7 +620,7 @@ char tokenTypeToSymbol(TokenType t) {
     }
 }
 
-string tokenVecToString(const vector<Token> tokens) {
+string tokenVecToString(const vector<Token>& tokens) {
     string ret = "";
     for (const Token& tok : tokens) {
         ret += tokenTypeToStr(tok.type);
@@ -650,10 +667,6 @@ public:
             cout << "got: " << given << endl;
             cout << "expected: " << expected << endl;
         }
-    }
-
-    void isError(const T& given, const string& description = "") {
-        cout << "Test (" << description << ") " << testNumber << ": ";
     }
 };
 
@@ -720,7 +733,7 @@ int main() {
         //cout << parseTreeToString(Parser(Lexer("(3+4)x").lex()).parse()) << endl; // should throw error
         //cout << parseTreeToString(Parser(Lexer("((3)").lex()).parse()) << endl; // should throw error
         //cout << parseTreeToString(Parser(Lexer("(3))").lex()).parse()) << endl; // should throw error
-        //cout << parseTreeToString(Parser(Lexer("cos(3)))").lex()).parse()) << endl; // should throw error
+        cout << parseTreeToString(Parser(Lexer("cos(3)))").lex()).parse()) << endl; // should throw error
     }
 
     {
@@ -751,6 +764,19 @@ int main() {
 
         //cout << parseTreeToString(diff(Parser(Lexer("3*x + 2x").lex()).parse())) << endl; // should throw error
 
+    }
+
+    {
+        cout << "Testing Calculator:" << endl;
+        cout << Calculator(10).calc(Parser(Lexer("20 + x").lex()).parse()) << endl;
+        cout << Calculator(value_t(10, 4)).calc(Parser(Lexer("20 + x").lex()).parse()) << endl;
+        cout << Calculator(value_t(0, 1)).calc(Parser(Lexer("2.718281828459^(3.14159265359*x)").lex()).parse()) << endl; // euler identity: e^(pi*i) = -1
+        cout << Calculator(3).calc(diff(Parser(Lexer("x^4 + 10*x").lex()).parse())) << endl;
+
+
+        // tan(x/x^x*x^x-x^(x^x)/cos(63.5+40.1)^x/(10.5^x/x^88+54.3^57.9*x^2.1/x-47.1^9.5)), x = (6.04,8.62)
+        cout << Calculator(value_t(6.04, 8.62)).calc(diff(diff(Parser(Lexer("tan(x/x^x*x^x-x^(x^x)/cos(63.5+40.1)^x/(10.5^x/x^88+54.3^57.9*x^2.1/x-47.1^9.5))").lex()).parse()))) << endl;
+        cout << Calculator(value_t(6.04, 8.62)).calc(diff(Parser(Lexer("tan(x/x^x*x^x-x^(x^x)/cos(63.5+40.1)^x/(10.5^x/x^88+54.3^57.9*x^2.1/x-47.1^9.5))").lex()).parse())) << endl;
     }
 
     return 0;
