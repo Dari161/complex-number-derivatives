@@ -346,7 +346,7 @@ Node* diff(Node* root) {
             };
         }
             break;
-        case TokenType::Tcot: // (cot(x))' = -1
+        case TokenType::Tcot: // (cot(x))' = -1 / sin(x)^2
         {
             Node* minusOne = new Node{ NodeType::constant, TokenType::Tconst, -1, nullptr, nullptr };
             Node* sinFunc = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
