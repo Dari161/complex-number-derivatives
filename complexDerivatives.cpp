@@ -288,15 +288,16 @@ public:
 
 Node* diff(Node* root) {
     switch (root->type) {
-    case NodeType::constant:
+    case NodeType::constant: // c' = 0
         return new Node{ NodeType::constant, TokenType::Tconst, 0, nullptr, nullptr };
-    case NodeType::variable:
+    case NodeType::variable: // x' = 1  (3x is a multiplication, so it will be 3'x + 3x' == 3; this differentiation happens in multiplication, not here)
         return new Node{ NodeType::constant, TokenType::Tconst, 1, nullptr, nullptr };
     case NodeType::funcCall:
     {
+        // f(x) = x' * f'(x)     (chain rule)
         Node* res = new Node{ NodeType::binaryOp, TokenType::Tmult, 0, diff(root->a), nullptr };
         switch (root->tokType) {
-        case TokenType::Tsin:
+        case TokenType::Tsin: // (sin(x))' = cos(x)
         {
             res->b = new Node{ NodeType::funcCall, TokenType::Tcos, 0,
                 root->a,
@@ -304,7 +305,7 @@ Node* diff(Node* root) {
             };
         }
             break;
-        case TokenType::Tcos:
+        case TokenType::Tcos: // (cos(x))' = -1 * sin(x)
         {
             Node* minusOne = new Node{ NodeType::constant, TokenType::Tconst, -1, nullptr, nullptr };
             Node* sinFunc = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
@@ -317,7 +318,7 @@ Node* diff(Node* root) {
             };
         }
             break;
-        case TokenType::Ttan:
+        case TokenType::Ttan: // (tan(x))' = 1 / cos(x)^2
         {
             Node* one = new Node{ NodeType::constant, TokenType::Tconst, 1, nullptr, nullptr };
             Node* cosFunc = new Node{ NodeType::funcCall, TokenType::Tcos, 0,
@@ -335,7 +336,7 @@ Node* diff(Node* root) {
             };
         }
             break;
-        case TokenType::Tcot:
+        case TokenType::Tcot: // (cot(x))' = -1
         {
             Node* minusOne = new Node{ NodeType::constant, TokenType::Tconst, -1, nullptr, nullptr };
             Node* sinFunc = new Node{ NodeType::funcCall, TokenType::Tsin, 0,
@@ -353,7 +354,7 @@ Node* diff(Node* root) {
             };
         }
             break;
-        case TokenType::Tlog:
+        case TokenType::Tlog: // log is ln here // (ln(x))' = 1 / x
         {
             Node* one = new Node{ NodeType::constant, TokenType::Tconst, 1, nullptr, nullptr };
             res->b = new Node{ NodeType::binaryOp, TokenType::Tdiv, 0,
@@ -369,17 +370,17 @@ Node* diff(Node* root) {
     }
     case NodeType::binaryOp:
         switch (root->tokType) {
-        case TokenType::Tplus:
+        case TokenType::Tplus: // (a+b)' = a' + b'
             return new Node{ NodeType::binaryOp, TokenType::Tplus, 0,
                 diff(root->a),
                 diff(root->b)
             };
-        case TokenType::Tminus:
+        case TokenType::Tminus: // (a - b)' = a' - b'
             return new Node{ NodeType::binaryOp, TokenType::Tminus, 0,
                 diff(root->a),
                 diff(root->b)
             };
-        case TokenType::Tmult:
+        case TokenType::Tmult: // (a * b)' = a' * b + a * b'
         {
             Node* left = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
                 diff(root->a),
@@ -394,7 +395,7 @@ Node* diff(Node* root) {
                 right
             };
         }
-        case TokenType::Tdiv:
+        case TokenType::Tdiv: // (a / b)' = (a' * b - a * b') / b^2
         {
             Node* left = new Node{ NodeType::binaryOp, TokenType::Tmult, 0,
                 diff(root->a),
@@ -418,7 +419,14 @@ Node* diff(Node* root) {
                 bottom
             };
         }
-        case TokenType::Tpow:
+        case TokenType::Tpow: // (f^g)' = (f^g) * (g' * ln(f) + g * (f' / f)), where f and g are function of x: f = f(x), g = g(x), (Though they can be independent of x)
+            // Examples:
+            // Where g is constant:
+            // (x^4)' = x^4 * (0 * ... + 4 * (1/x)) = x^4 * (4/x) = 4x^4 / x = 4x^3
+            // ((2x)^4)' = (2x)^4 * (0 * ... + 4 * (2/(2x))) = (2x)^4 * (8/(2x)) = 8(2x)^4 / (2x) = 8(2x)^3 = 2 * 4(2x)^3
+            // Where f is constant:
+            // (4^x)' = 4^x * (1 * ln(4) + x * (0/4)) = 4^x * (ln(4) + 0) = 4^x * ln(4)
+            // (4^(2x))' = 4^(2x) * (2 * ln(4) + 2x * (0/4)) = 4^(2x) * (2 * ln(4) + 0) = 4^(2x) * 2 * ln(4)
         {
             Node* left = new Node{ NodeType::binaryOp, TokenType::Tpow, 0,
                 root->a,
