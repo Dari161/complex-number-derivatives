@@ -18,7 +18,9 @@ using func_t = function<value_t(value_t)>;
 enum TokenType {
     Tconst,
     Tvariable,
-    Tsin, Tcos, Ttan, Tcot, Tlog,
+    Tsin, Tcos, Ttan, Tcot,
+    Tsinh, Tcosh,
+    Tlog,
     Tplus, Tminus, Tmult, Tdiv, Tpow,
     TlParen, TrParen,
     TEND
@@ -140,6 +142,10 @@ public:
                         res.push_back(Token{ TokenType::Ttan, 0 });
                     } else if (functionType == "cot") {
                         res.push_back(Token{ TokenType::Tcot, 0 });
+                    } else if (functionType == "sinh") {
+                        res.push_back(Token{ TokenType::Tsinh, 0 });
+                    } else if (functionType == "cosh") {
+                        res.push_back(Token{ TokenType::Tcosh, 0 });
                     } else if (functionType == "log") {
                         res.push_back(Token{ TokenType::Tlog, 0 });
                     } else if (functionType != "") {
@@ -233,6 +239,8 @@ private:
             (toks[pos].type == TokenType::Tcos) ||
             (toks[pos].type == TokenType::Ttan) ||
             (toks[pos].type == TokenType::Tcot) ||
+            (toks[pos].type == TokenType::Tsinh) ||
+            (toks[pos].type == TokenType::Tcosh) ||
             (toks[pos].type == TokenType::Tlog))) {
             throw "Parser error: expected function identifier";
         }
@@ -264,6 +272,8 @@ private:
             (toks[pos].type == TokenType::Tcos) ||
             (toks[pos].type == TokenType::Ttan) ||
             (toks[pos].type == TokenType::Tcot) ||
+            (toks[pos].type == TokenType::Tsinh) ||
+            (toks[pos].type == TokenType::Tcosh) ||
             (toks[pos].type == TokenType::Tlog)) {
             return func_call();
         }
@@ -354,6 +364,22 @@ Node* diff(Node* root) {
             };
         }
             break;
+        case TokenType::Tsinh: // (sinh(x))' = cosh(x)
+        {
+            res->b = new Node{ NodeType::funcCall, TokenType::Tcosh, 0,
+                root->a,
+                nullptr
+            };
+        }
+            break;
+        case TokenType::Tcosh: // (cosh(x))' = sinh(x)
+        {
+            res->b = new Node{ NodeType::funcCall, TokenType::Tsinh, 0,
+                root->a,
+                nullptr
+            };
+        }
+        break;
         case TokenType::Tlog: // log is ln here // (ln(x))' = 1 / x
         {
             Node* one = new Node{ NodeType::constant, TokenType::Tconst, 1, nullptr, nullptr };
@@ -491,6 +517,10 @@ public:
                 if (tanValue == 0.0) throw "Calculator error: division by 0 (cot = 1 / tan)";
                 return 1.0 / tanValue;
             }
+            case TokenType::Tsinh:
+                return sinh(calc(root->a));
+            case TokenType::Tcosh:
+                return cosh(calc(root->a));
             case TokenType::Tlog:
             {
                 value_t a = calc(root->a);
@@ -580,6 +610,10 @@ string tokenTypeToStr(TokenType t) {
         return "tan";
     case TokenType::Tcot:
         return "cot";
+    case TokenType::Tsinh:
+        return "sinh";
+    case TokenType::Tcosh:
+        return "cosh";
     case TokenType::Tlog:
         return "log";
     case TokenType::Tplus:
@@ -741,7 +775,7 @@ int main() {
         //cout << parseTreeToString(Parser(Lexer("(3+4)x").lex()).parse()) << endl; // should throw error
         //cout << parseTreeToString(Parser(Lexer("((3)").lex()).parse()) << endl; // should throw error
         //cout << parseTreeToString(Parser(Lexer("(3))").lex()).parse()) << endl; // should throw error
-        cout << parseTreeToString(Parser(Lexer("cos(3)))").lex()).parse()) << endl; // should throw error
+        //cout << parseTreeToString(Parser(Lexer("cos(3)))").lex()).parse()) << endl; // should throw error
     }
 
     {
@@ -772,6 +806,9 @@ int main() {
 
         //cout << parseTreeToString(diff(Parser(Lexer("3*x + 2x").lex()).parse())) << endl; // should throw error
 
+        cout << parseTreeToString(diff(Parser(Lexer("sinh(5*x)").lex()).parse())) << endl;
+        cout << parseTreeToString(diff(Parser(Lexer("cosh(5+2*x)").lex()).parse())) << endl;
+
     }
 
     {
@@ -780,6 +817,9 @@ int main() {
         cout << Calculator(value_t(10, 4)).calc(Parser(Lexer("20 + x").lex()).parse()) << endl;
         cout << Calculator(value_t(0, 1)).calc(Parser(Lexer("2.718281828459^(3.14159265359*x)").lex()).parse()) << endl; // euler identity: e^(pi*i) = -1
         cout << Calculator(3).calc(diff(Parser(Lexer("x^4 + 10*x").lex()).parse())) << endl;
+
+        cout << Calculator(value_t(3, 0.1)).calc(diff(Parser(Lexer("sinh(5*x)").lex()).parse())) << endl;
+        cout << Calculator(value_t(0.55, 39)).calc(diff(Parser(Lexer("cosh(5*x)").lex()).parse())) << endl;
 
 
         // tan(x/x^x*x^x-x^(x^x)/cos(63.5+40.1)^x/(10.5^x/x^88+54.3^57.9*x^2.1/x-47.1^9.5)), x = (6.04,8.62)
